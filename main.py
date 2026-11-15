@@ -1,7 +1,9 @@
 import sys
-from PySide6.QtWidgets import QApplication, QLabel
+from PySide6.QtWidgets import QApplication
+from gui.fenetre import Fenetre
 
 app = QApplication(sys.argv)
-label = QLabel("Hello bio-info")
-label.show()
+fenetre = Fenetre()
+fenetre.resize(700, 800)
+fenetre.show()
 sys.exit(app.exec())
