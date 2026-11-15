@@ -22,6 +22,6 @@ def dotplot(seq_a, seq_b, fenetre=1, seuil=None):
 
 def tracer_dotplot(matrice, ax, nom_a="séquence A", nom_b="séquence B"):
     """Dessine la matrice sur un axe matplotlib (aucune dépendance à PySide6)."""
-    ax.imshow(~matrice, cmap="gray", aspect="auto", interpolation="nearest")
+    ax.imshow(~matrice, cmap="gray", aspect="auto", interpolation="nearest", origin="lower")
     ax.set_xlabel(nom_b)
     ax.set_ylabel(nom_a)

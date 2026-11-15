@@ -18,3 +18,10 @@ def test_local():
 def test_mode_invalide():
     with pytest.raises(ValueError):
         aligner("A", "A", mode="xyz")
+
+
+def test_local_bat_global_sur_bords_differents():
+    a = "T" * 10 + "ATGCGTACGTTAGC" + "T" * 10
+    b = "G" * 10 + "ATGCGTACGTTAGC" + "C" * 9
+    assert aligner(a, b, mode="local")[0] == 14
+    assert aligner(a, b, mode="global")[0] == -7
