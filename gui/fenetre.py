@@ -8,6 +8,7 @@ from core.fasta import lire_fasta
 from core.dotplot import dotplot, tracer_dotplot
 from core.alignement import aligner_complet, type_sequence
 from core.ncbi import telecharger_fasta
+from gui.exports import ExportMixin
 from PySide6.QtCore import QSettings
 from gui.travailleur import Travailleur
 from PySide6.QtGui import QFontDatabase
@@ -15,7 +16,7 @@ from PySide6.QtGui import QFontDatabase
 MAX_CASES = 25_000_000  # garde-fou mémoire (~75 Mo)
 
 
-class Fenetre(QMainWindow):
+class Fenetre(ExportMixin, QMainWindow):
     def __init__(self, presence=None):
         super().__init__()
         self.presence = presence
@@ -85,6 +86,17 @@ class Fenetre(QMainWindow):
             bareme.addWidget(spin)
         bareme.addStretch(1)
         layout.addLayout(bareme)
+
+        export = QHBoxLayout()
+        export.addWidget(QLabel("Exporter :"))
+        for texte, action in (("Dotplot (PNG/SVG)", self.exporter_dotplot),
+                              ("Alignement (texte)", self.exporter_texte),
+                              ("Alignement (FASTA)", self.exporter_fasta)):
+            bouton = QPushButton(texte)
+            bouton.clicked.connect(action)
+            export.addWidget(bouton)
+        export.addStretch(1)
+        layout.addLayout(export)
 
         self.figure = Figure(figsize=(5, 5))
         self.canvas = FigureCanvasQTAgg(self.figure)
@@ -184,6 +196,7 @@ class Fenetre(QMainWindow):
             return
         mode = self.mode.currentText()
         self.mode_calcule = mode
+        self.ids_align = (id_a, id_b)
         p = {k: v.value() for k, v in self.params.items()}
         if "proteine" in (type_sequence(a), type_sequence(b)):
             args = (mode, 1, -1, -10, -1, "BLOSUM62")
@@ -197,6 +210,7 @@ class Fenetre(QMainWindow):
 
     def _afficher_alignement(self, resultat):
         score, la, lb, (da, fa), (db, fb) = resultat
+        self.dernier = (self.ids_align, la, lb)
         milieu = "".join("|" if x == y else " " for x, y in zip(la, lb))
         ident = milieu.count("|")
         texte = [f"Mode : {self.mode_calcule} | score : {score} | identité : {ident}/{len(la)}",
