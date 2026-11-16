@@ -6,17 +6,20 @@ from matplotlib.figure import Figure
 
 from core.fasta import lire_fasta
 from core.dotplot import dotplot, tracer_dotplot
-from core.alignement import aligner
+from core.alignement import aligner_complet
 from core.ncbi import telecharger_fasta
 from PySide6.QtCore import QSettings
+from gui.travailleur import Travailleur
 from PySide6.QtGui import QFontDatabase
 
 MAX_CASES = 25_000_000  # garde-fou mémoire (~75 Mo)
 
 
 class Fenetre(QMainWindow):
-    def __init__(self):
+    def __init__(self, presence=None):
         super().__init__()
+        self.presence = presence
+        self.tache = None
         self.setWindowTitle("bioapp")
         self.seqs = {"A": None, "B": None}  # (identifiant, séquence)
         self.labels = {}
@@ -41,9 +44,9 @@ class Fenetre(QMainWindow):
         self.email.setPlaceholderText("e-mail (requis par NCBI)")
         self.cible = QComboBox()
         self.cible.addItems(["A", "B"])
-        btn_ncbi = QPushButton("Télécharger")
-        btn_ncbi.clicked.connect(self.telecharger)
-        for w in (self.accession, self.email, self.cible, btn_ncbi):
+        self.btn_ncbi = QPushButton("Télécharger")
+        self.btn_ncbi.clicked.connect(self.telecharger)
+        for w in (self.accession, self.email, self.cible, self.btn_ncbi):
             ligne_ncbi.addWidget(w)
         layout.addLayout(ligne_ncbi)
 
@@ -66,6 +69,22 @@ class Fenetre(QMainWindow):
         options.addWidget(self.btn_align)
         options.addStretch(1)
         layout.addLayout(options)
+
+        bareme = QHBoxLayout()
+        self.params = {}
+        for cle, nom, defaut, mini, maxi in (
+                ("match", "Match", 1, 0, 20),
+                ("mismatch", "Mismatch", -1, -20, 0),
+                ("ouverture", "Gap (ouverture)", -2, -20, 0),
+                ("extension", "Gap (extension)", -1, -20, 0)):
+            bareme.addWidget(QLabel(nom + " :"))
+            spin = QSpinBox()
+            spin.setRange(mini, maxi)
+            spin.setValue(defaut)
+            self.params[cle] = spin
+            bareme.addWidget(spin)
+        bareme.addStretch(1)
+        layout.addLayout(bareme)
 
         self.figure = Figure(figsize=(5, 5))
         self.canvas = FigureCanvasQTAgg(self.figure)
@@ -100,19 +119,60 @@ class Fenetre(QMainWindow):
         self.btn_dot.setEnabled(pret)
         self.btn_align.setEnabled(pret)
 
+    def statut(self, texte):
+        self.statusBar().showMessage(texte)
+        if self.presence is not None:
+            self.presence.maj(texte)
+
+    def occupe(self, oui):
+        for w in (self.btn_dot, self.btn_align, self.btn_ncbi):
+            w.setEnabled(not oui)
+        if not oui:
+            pret = all(self.seqs.values())
+            self.btn_dot.setEnabled(pret)
+            self.btn_align.setEnabled(pret)
+
+    def lancer(self, message, fonction, apres, *args):
+        if self.tache is not None and self.tache.isRunning():
+            return
+        self.occupe(True)
+        self.statut(message)
+        self._apres = apres
+        self.tache = Travailleur(fonction, *args)
+        self.tache.termine.connect(self._fin)
+        self.tache.echec.connect(self._echec)
+        self.tache.start()
+
+    def _fin(self, resultat):
+        self.tache.wait()
+        self.occupe(False)
+        self.statut("Analyse de séquences")
+        self._apres(resultat)
+
+    def _echec(self, message):
+        self.tache.wait()
+        self.occupe(False)
+        self.statut("Analyse de séquences")
+        QMessageBox.warning(self, "Erreur", message)
+
+    def closeEvent(self, event):
+        if self.tache is not None and self.tache.isRunning():
+            self.tache.wait(10000)
+        event.accept()
+
     def tracer(self):
         (id_a, a), (id_b, b) = self.seqs["A"], self.seqs["B"]
         if len(a) * len(b) > MAX_CASES:
             QMessageBox.warning(self, "Trop grand",
                                 "Séquences trop longues pour un dotplot complet.")
             return
-        try:
-            matrice = dotplot(a, b, fenetre=self.spin.value())
-        except ValueError as e:
-            QMessageBox.warning(self, "Erreur", str(e))
-            return
+        self.noms_dot = (id_a, id_b)
+        self.lancer(f"Dotplot de {id_a} vs {id_b}", dotplot,
+                    self._afficher_dotplot, a, b, self.spin.value())
+
+    def _afficher_dotplot(self, matrice):
         self.figure.clear()
-        tracer_dotplot(matrice, self.figure.add_subplot(111), id_a, id_b)
+        tracer_dotplot(matrice, self.figure.add_subplot(111), *self.noms_dot)
         self.canvas.draw()
 
     def lancer_alignement(self):
@@ -122,10 +182,20 @@ class Fenetre(QMainWindow):
                                 "Séquences trop longues pour cet alignement.")
             return
         mode = self.mode.currentText()
-        score, la, lb = aligner(a.upper(), b.upper(), mode=mode)
+        self.mode_calcule = mode
+        p = {k: v.value() for k, v in self.params.items()}
+        self.lancer(f"Alignement {mode} de {id_a} vs {id_b}", aligner_complet,
+                    self._afficher_alignement, a.upper(), b.upper(), mode,
+                    p["match"], p["mismatch"], p["ouverture"], p["extension"])
+
+    def _afficher_alignement(self, resultat):
+        score, la, lb, (da, fa), (db, fb) = resultat
         milieu = "".join("|" if x == y else " " for x, y in zip(la, lb))
         ident = milieu.count("|")
-        texte = [f"Mode : {mode} | score : {score} | identité : {ident}/{len(la)}", ""]
+        texte = [f"Mode : {self.mode_calcule} | score : {score} | identité : {ident}/{len(la)}"]
+        if self.mode_calcule == "local" and la:
+            texte.append(f"Région alignée : A {da + 1}–{fa} | B {db + 1}–{fb}")
+        texte.append("")
         for i in range(0, len(la), 60):
             texte += [la[i:i + 60], milieu[i:i + 60], lb[i:i + 60], ""]
         self.sortie.setPlainText("\n".join(texte))
@@ -133,9 +203,10 @@ class Fenetre(QMainWindow):
     def telecharger(self):
         email = self.email.text().strip()
         QSettings("bioapp", "bioapp").setValue("email", email)
-        try:
-            chemin = telecharger_fasta(self.accession.text(), email)
-        except Exception as e:
-            QMessageBox.warning(self, "NCBI", f"Téléchargement impossible : {e}")
-            return
-        self.charger_chemin(self.cible.currentText(), str(chemin))
+        accession = self.accession.text().strip()
+        self.cible_tel = self.cible.currentText()
+        self.lancer(f"Téléchargement de {accession}", telecharger_fasta,
+                    self._fichier_telecharge, accession, email)
+
+    def _fichier_telecharge(self, chemin):
+        self.charger_chemin(self.cible_tel, str(chemin))
