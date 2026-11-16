@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QLabel, QFileDialog, QMessageBox, QSpinBox,
-                               QComboBox, QPlainTextEdit, QLineEdit)
+                               QComboBox, QPlainTextEdit, QLineEdit, QDoubleSpinBox)
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
@@ -79,7 +79,9 @@ class Fenetre(ExportMixin, QMainWindow):
                 ("ouverture", "Gap (ouverture)", -2, -20, 0),
                 ("extension", "Gap (extension)", -1, -20, 0)):
             bareme.addWidget(QLabel(nom + " :"))
-            spin = QSpinBox()
+            spin = QDoubleSpinBox()
+            spin.setDecimals(1)
+            spin.setSingleStep(0.5)
             spin.setRange(mini, maxi)
             spin.setValue(defaut)
             self.params[cle] = spin
