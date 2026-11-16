@@ -63,3 +63,18 @@ def test_blosum62_local():
     r = aligner_complet("HEAGAWGHEE", "PAWHEAE", mode="local", matrice="BLOSUM62",
                         ouverture=-10, extension=-1)
     assert r[0] == 18
+
+
+def test_semi_global_sequence_incluse():
+    r = aligner_complet("GGGACGTACGTGGG", "ACGTACGT", mode="semi-global")
+    assert r[:3] == (8.0, "GGGACGTACGTGGG", "---ACGTACGT---")
+    assert aligner_complet("GGGACGTACGTGGG", "ACGTACGT")[0] == 0.0  # global : pénalisé
+
+
+def test_semi_global_chevauchement():
+    r = aligner_complet("TTTTACGTACGT", "ACGTACGT", mode="semi-global")
+    assert r[:3] == (8.0, "TTTTACGTACGT", "----ACGTACGT")
+
+
+def test_semi_global_identique():
+    assert aligner_complet("ACGT", "ACGT", mode="semi-global")[0] == 4.0

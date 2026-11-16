@@ -62,7 +62,7 @@ class Fenetre(ExportMixin, QMainWindow):
         self.btn_dot.clicked.connect(self.tracer)
         options.addWidget(self.btn_dot)
         self.mode = QComboBox()
-        self.mode.addItems(["global", "local"])
+        self.mode.addItems(["global", "semi-global", "local"])
         options.addWidget(self.mode)
         self.btn_align = QPushButton("Aligner")
         self.btn_align.setEnabled(False)
