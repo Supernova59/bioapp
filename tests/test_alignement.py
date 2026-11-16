@@ -44,3 +44,22 @@ def test_bareme_modifiable():
 def test_local_sans_ressemblance():
     r = aligner_complet("AAAA", "TTTT", mode="local")
     assert r[0] == 0 and r[1] == "" and r[2] == ""
+
+
+from core.alignement import type_sequence
+
+
+def test_type_sequence():
+    assert type_sequence("ACGTNacgt") == "nucleotide"
+    assert type_sequence("MKVLAAGIVG") == "proteine"
+
+
+def test_blosum62_identique():
+    r = aligner_complet("ACDEF", "ACDEF", matrice="BLOSUM62", ouverture=-10, extension=-1)
+    assert r[0] == 30
+
+
+def test_blosum62_local():
+    r = aligner_complet("HEAGAWGHEE", "PAWHEAE", mode="local", matrice="BLOSUM62",
+                        ouverture=-10, extension=-1)
+    assert r[0] == 18

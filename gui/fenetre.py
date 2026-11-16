@@ -6,7 +6,7 @@ from matplotlib.figure import Figure
 
 from core.fasta import lire_fasta
 from core.dotplot import dotplot, tracer_dotplot
-from core.alignement import aligner_complet
+from core.alignement import aligner_complet, type_sequence
 from core.ncbi import telecharger_fasta
 from PySide6.QtCore import QSettings
 from gui.travailleur import Travailleur
@@ -114,7 +114,8 @@ class Fenetre(QMainWindow):
         self.seqs[cle] = entrees[0]  # première séquence du fichier
         ident, seq = entrees[0]
         suite = f" (+{len(entrees) - 1} ignorées)" if len(entrees) > 1 else ""
-        self.labels[cle].setText(f"{ident} — {len(seq)} pb{suite}")
+        unite = "pb" if type_sequence(seq) == "nucleotide" else "aa"
+        self.labels[cle].setText(f"{ident} — {len(seq)} {unite}{suite}")
         pret = all(self.seqs.values())
         self.btn_dot.setEnabled(pret)
         self.btn_align.setEnabled(pret)
@@ -184,15 +185,22 @@ class Fenetre(QMainWindow):
         mode = self.mode.currentText()
         self.mode_calcule = mode
         p = {k: v.value() for k, v in self.params.items()}
+        if "proteine" in (type_sequence(a), type_sequence(b)):
+            args = (mode, 1, -1, -10, -1, "BLOSUM62")
+            self.info_bareme = "protéines : BLOSUM62, gap -10/-1"
+        else:
+            args = (mode, p["match"], p["mismatch"], p["ouverture"], p["extension"], None)
+            self.info_bareme = (f"ADN : match {p['match']}, mismatch {p['mismatch']}, "
+                                f"gap {p['ouverture']}/{p['extension']}")
         self.lancer(f"Alignement {mode} de {id_a} vs {id_b}", aligner_complet,
-                    self._afficher_alignement, a.upper(), b.upper(), mode,
-                    p["match"], p["mismatch"], p["ouverture"], p["extension"])
+                    self._afficher_alignement, a.upper(), b.upper(), *args)
 
     def _afficher_alignement(self, resultat):
         score, la, lb, (da, fa), (db, fb) = resultat
         milieu = "".join("|" if x == y else " " for x, y in zip(la, lb))
         ident = milieu.count("|")
-        texte = [f"Mode : {self.mode_calcule} | score : {score} | identité : {ident}/{len(la)}"]
+        texte = [f"Mode : {self.mode_calcule} | score : {score} | identité : {ident}/{len(la)}",
+                 self.info_bareme]
         if self.mode_calcule == "local" and la:
             texte.append(f"Région alignée : A {da + 1}–{fa} | B {db + 1}–{fb}")
         texte.append("")

@@ -1,19 +1,29 @@
-from Bio.Align import PairwiseAligner
+from Bio.Align import PairwiseAligner, substitution_matrices
 
 VIDE = (0.0, "", "", (0, 0), (0, 0))
 
 
+def type_sequence(seq):
+    """'nucleotide' si la séquence ne contient que A, C, G, T, U, N, sinon 'proteine'."""
+    lettres = set(seq.upper()) - set("-*")
+    return "nucleotide" if lettres <= set("ACGTUN") else "proteine"
+
+
 def aligner_complet(seq_a, seq_b, mode="global", match=1, mismatch=-1,
-                    ouverture=-2, extension=-1):
+                    ouverture=-2, extension=-1, matrice=None):
     """Aligne deux séquences. mode : 'global' ou 'local'.
+    matrice : None (barème match/mismatch) ou nom d'une matrice, par ex. 'BLOSUM62'.
     Retourne (score, ligne_a, ligne_b, (debut_a, fin_a), (debut_b, fin_b)).
     Positions en base 0, fin exclue, sur la région alignée."""
     if mode not in ("global", "local"):
         raise ValueError("mode doit être 'global' ou 'local'")
     al = PairwiseAligner()
     al.mode = mode
-    al.match_score = match
-    al.mismatch_score = mismatch
+    if matrice:
+        al.substitution_matrix = substitution_matrices.load(matrice)
+    else:
+        al.match_score = match
+        al.mismatch_score = mismatch
     al.open_gap_score = ouverture
     al.extend_gap_score = extension
     try:
