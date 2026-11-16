@@ -1,12 +1,14 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QLabel, QFileDialog, QMessageBox, QSpinBox,
-                               QComboBox, QPlainTextEdit)
+                               QComboBox, QPlainTextEdit, QLineEdit)
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
 from core.fasta import lire_fasta
 from core.dotplot import dotplot, tracer_dotplot
 from core.alignement import aligner
+from core.ncbi import telecharger_fasta
+from PySide6.QtCore import QSettings
 from PySide6.QtGui import QFontDatabase
 
 MAX_CASES = 25_000_000  # garde-fou mémoire (~75 Mo)
@@ -31,6 +33,19 @@ class Fenetre(QMainWindow):
             ligne.addWidget(bouton)
             ligne.addWidget(self.labels[cle], 1)
             layout.addLayout(ligne)
+
+        ligne_ncbi = QHBoxLayout()
+        self.accession = QLineEdit()
+        self.accession.setPlaceholderText("accession NCBI (ex. NM_000546)")
+        self.email = QLineEdit(QSettings("bioapp", "bioapp").value("email", ""))
+        self.email.setPlaceholderText("e-mail (requis par NCBI)")
+        self.cible = QComboBox()
+        self.cible.addItems(["A", "B"])
+        btn_ncbi = QPushButton("Télécharger")
+        btn_ncbi.clicked.connect(self.telecharger)
+        for w in (self.accession, self.email, self.cible, btn_ncbi):
+            ligne_ncbi.addWidget(w)
+        layout.addLayout(ligne_ncbi)
 
         options = QHBoxLayout()
         options.addWidget(QLabel("Fenêtre :"))
@@ -67,6 +82,9 @@ class Fenetre(QMainWindow):
             self, "Ouvrir un FASTA", "", "FASTA (*.fasta *.fa *.fna *.faa);;Tous (*)")
         if not chemin:
             return
+        self.charger_chemin(cle, chemin)
+
+    def charger_chemin(self, cle, chemin):
         try:
             entrees = lire_fasta(chemin)
             if not entrees:
@@ -111,3 +129,13 @@ class Fenetre(QMainWindow):
         for i in range(0, len(la), 60):
             texte += [la[i:i + 60], milieu[i:i + 60], lb[i:i + 60], ""]
         self.sortie.setPlainText("\n".join(texte))
+
+    def telecharger(self):
+        email = self.email.text().strip()
+        QSettings("bioapp", "bioapp").setValue("email", email)
+        try:
+            chemin = telecharger_fasta(self.accession.text(), email)
+        except Exception as e:
+            QMessageBox.warning(self, "NCBI", f"Téléchargement impossible : {e}")
+            return
+        self.charger_chemin(self.cible.currentText(), str(chemin))

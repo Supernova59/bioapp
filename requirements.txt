@@ -12,6 +12,7 @@ pillow==12.3.0
 pluggy==1.7.0
 Pygments==2.21.0
 pyparsing==3.3.3
+pypresence==4.6.2
 PySide6==6.12.0
 PySide6_Addons==6.12.0
 PySide6_Essentials==6.12.0
