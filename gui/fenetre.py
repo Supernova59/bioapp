@@ -9,6 +9,9 @@ from core.dotplot import dotplot, tracer_dotplot
 from core.alignement import aligner_complet, type_sequence
 from core.ncbi import telecharger_fasta
 from gui.exports import ExportMixin
+from gui.outils import OutilsMixin
+from core.sequences import complement_inverse
+from PySide6.QtWidgets import QCheckBox
 from PySide6.QtCore import QSettings
 from gui.travailleur import Travailleur
 from PySide6.QtGui import QFontDatabase
@@ -16,7 +19,7 @@ from PySide6.QtGui import QFontDatabase
 MAX_CASES = 25_000_000  # garde-fou mémoire (~75 Mo)
 
 
-class Fenetre(ExportMixin, QMainWindow):
+class Fenetre(OutilsMixin, ExportMixin, QMainWindow):
     def __init__(self, presence=None):
         super().__init__()
         self.presence = presence
@@ -61,6 +64,8 @@ class Fenetre(ExportMixin, QMainWindow):
         self.btn_dot.setEnabled(False)
         self.btn_dot.clicked.connect(self.tracer)
         options.addWidget(self.btn_dot)
+        self.chk_rc = QCheckBox("B en complément inverse")
+        options.addWidget(self.chk_rc)
         self.mode = QComboBox()
         self.mode.addItems(["global", "semi-global", "local"])
         options.addWidget(self.mode)
@@ -97,6 +102,9 @@ class Fenetre(ExportMixin, QMainWindow):
             bouton = QPushButton(texte)
             bouton.clicked.connect(action)
             export.addWidget(bouton)
+        btn_outils = QPushButton("Outils…")
+        btn_outils.clicked.connect(self.ouvrir_outils)
+        export.addWidget(btn_outils)
         export.addStretch(1)
         layout.addLayout(export)
 
@@ -181,6 +189,13 @@ class Fenetre(ExportMixin, QMainWindow):
             QMessageBox.warning(self, "Trop grand",
                                 "Séquences trop longues pour un dotplot complet.")
             return
+        if self.chk_rc.isChecked():
+            if type_sequence(b) != "nucleotide":
+                QMessageBox.information(self, "Dotplot",
+                                        "Le complément inverse ne s'applique qu'à l'ADN.")
+                return
+            b = complement_inverse(b)
+            id_b = f"{id_b} (compl. inverse)"
         self.noms_dot = (id_a, id_b)
         self.lancer(f"Dotplot de {id_a} vs {id_b}", dotplot,
                     self._afficher_dotplot, a, b, self.spin.value())
