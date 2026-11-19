@@ -9,6 +9,9 @@ from core.dotplot import dotplot, tracer_dotplot
 from core.alignement import aligner_complet, type_sequence
 from core.ncbi import telecharger_fasta
 from gui.exports import ExportMixin
+from gui.couleurs import colorer_alignement
+from gui.trio import TrioMixin
+from PySide6.QtWidgets import QTextEdit
 from gui.outils import OutilsMixin
 from core.sequences import complement_inverse
 from PySide6.QtWidgets import QCheckBox
@@ -19,7 +22,7 @@ from PySide6.QtGui import QFontDatabase
 MAX_CASES = 25_000_000  # garde-fou mémoire (~75 Mo)
 
 
-class Fenetre(OutilsMixin, ExportMixin, QMainWindow):
+class Fenetre(TrioMixin, OutilsMixin, ExportMixin, QMainWindow):
     def __init__(self, presence=None):
         super().__init__()
         self.presence = presence
@@ -105,6 +108,9 @@ class Fenetre(OutilsMixin, ExportMixin, QMainWindow):
         btn_outils = QPushButton("Outils…")
         btn_outils.clicked.connect(self.ouvrir_outils)
         export.addWidget(btn_outils)
+        btn_trio = QPushButton("Comparer A/B/C…")
+        btn_trio.clicked.connect(self.ouvrir_trio)
+        export.addWidget(btn_trio)
         export.addStretch(1)
         layout.addLayout(export)
 
@@ -112,15 +118,19 @@ class Fenetre(OutilsMixin, ExportMixin, QMainWindow):
         self.canvas = FigureCanvasQTAgg(self.figure)
         layout.addWidget(self.canvas, 1)
 
-        self.sortie = QPlainTextEdit()
+        self.sortie = QTextEdit()
         self.sortie.setReadOnly(True)
         self.sortie.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.sortie.setMaximumHeight(180)
         layout.addWidget(self.sortie)
 
     def charger(self, cle):
+        reglages = QSettings("bioapp", "bioapp")
         chemin, _ = QFileDialog.getOpenFileName(
-            self, "Ouvrir un FASTA", "", "FASTA (*.fasta *.fa *.fna *.faa);;Tous (*)")
+            self, "Ouvrir un FASTA", reglages.value("dossier", ""),
+            "Tous (*);;FASTA (*.fasta *.fa *.fna *.faa)")
+        if chemin:
+            reglages.setValue("dossier", chemin.rsplit("/", 1)[0] if "/" in chemin else "")
         if not chemin:
             return
         self.charger_chemin(cle, chemin)
@@ -237,7 +247,7 @@ class Fenetre(OutilsMixin, ExportMixin, QMainWindow):
         texte.append("")
         for i in range(0, len(la), 60):
             texte += [la[i:i + 60], milieu[i:i + 60], lb[i:i + 60], ""]
-        self.sortie.setPlainText("\n".join(texte))
+        self.sortie.setHtml(colorer_alignement(texte))
 
     def telecharger(self):
         email = self.email.text().strip()
