@@ -26,6 +26,14 @@ class DialogueOutils(QDialog):
         onglets = QTabWidget()
         onglets.addTab(self._onglet_motifs(), "Motifs (Prosite)")
         onglets.addTab(self._onglet_signif(), "Significativité")
+        from gui.outils2 import page_hydro, page_msa, page_orf
+        onglets.addTab(page_orf(self), "Traduction / ORF")
+        onglets.addTab(page_hydro(self), "Hydropathie")
+        onglets.addTab(page_msa(self), "Alignement multiple")
+        from gui.outils2 import page_hydro, page_msa, page_orf
+        onglets.addTab(page_orf(self), "Traduction / ORF")
+        onglets.addTab(page_hydro(self), "Hydropathie")
+        onglets.addTab(page_msa(self), "Alignement multiple")
         QVBoxLayout(self).addWidget(onglets)
 
     # ---------- utilitaires ----------
@@ -141,6 +149,12 @@ class DialogueOutils(QDialog):
     def done(self, resultat):
         if self.tache is not None and self.tache.isRunning():
             self.tache.wait(10000)
+        page = getattr(self, "_page_msa", None)
+        if page is not None:
+            page.attendre()
+        page = getattr(self, "_page_msa", None)
+        if page is not None:
+            page.attendre()
         super().done(resultat)
 
 
