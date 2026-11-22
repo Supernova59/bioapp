@@ -74,3 +74,10 @@ def test_rechercher_arguments_invalides():
     for args in (("", "a@b.fr"), ("x", ""), ("x", "a@b.fr", "genome")):
         with pytest.raises(ValueError):
             ncbi.rechercher(*args)
+
+
+def test_base_imposee(tmp_path, appels):
+    ncbi.telecharger_fasta("P10599", "a@b.fr", cache=tmp_path, base="protein")
+    assert appels[0]["db"] == "protein"
+    with pytest.raises(ValueError):
+        ncbi.telecharger_fasta("P10599", "a@b.fr", cache=tmp_path / "x", base="genome")
