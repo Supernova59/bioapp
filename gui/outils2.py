@@ -2,8 +2,8 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel,
-                               QMessageBox, QPlainTextEdit, QPushButton, QSpinBox,
-                               QVBoxLayout, QWidget)
+                               QLineEdit, QMessageBox, QPlainTextEdit, QPushButton,
+                               QSpinBox, QVBoxLayout, QWidget)
 
 from core.alignement import type_sequence
 from core.annotation import chercher_orfs, profil_hydropathie, regions_hydrophobes, traduire
@@ -243,4 +243,118 @@ class PageMSA(QWidget):
 def page_msa(dialogue):
     page = PageMSA(dialogue)
     dialogue._page_msa = page
+    return page
+
+
+# ---------------------------------------------------------------- recherche NCBI
+from PySide6.QtWidgets import QListWidget, QListWidgetItem  # noqa: E402
+
+from core.ncbi import rechercher, telecharger_fasta  # noqa: E402
+
+
+class PageNCBI(QWidget):
+    def __init__(self, dialogue):
+        super().__init__()
+        self.dialogue = dialogue
+        self.tache = None
+        layout = QVBoxLayout(self)
+        ligne = QHBoxLayout()
+        self.terme = QLineEdit()
+        self.terme.setPlaceholderText("ex. TP53[Gene] AND human[Organism] AND refseq[filter]")
+        self.base = QComboBox()
+        self.base.addItems(["nucleotide", "protein"])
+        self.maximum = QSpinBox()
+        self.maximum.setRange(1, 100)
+        self.maximum.setValue(20)
+        self.btn_chercher = QPushButton("Chercher")
+        self.btn_chercher.clicked.connect(self.chercher)
+        self.terme.returnPressed.connect(self.chercher)
+        for w in (self.terme, self.base, self.maximum, self.btn_chercher):
+            ligne.addWidget(w)
+        layout.addLayout(ligne)
+        self.liste = QListWidget()
+        self.liste.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.liste.itemDoubleClicked.connect(lambda _: self.charger())
+        layout.addWidget(self.liste, 1)
+        bas = QHBoxLayout()
+        self.cible = QComboBox()
+        self.cible.addItems(["A", "B"])
+        self.btn_charger = QPushButton("Charger la sélection")
+        self.btn_charger.clicked.connect(self.charger)
+        self.etat = QLabel("L'e-mail est lu dans le champ de la fenêtre principale.")
+        for w in (QLabel("Charger en :"), self.cible, self.btn_charger):
+            bas.addWidget(w)
+        bas.addWidget(self.etat, 1)
+        layout.addLayout(bas)
+
+    def _email(self):
+        email = self.dialogue.fenetre.email.text().strip()
+        if not email:
+            QMessageBox.information(self, "NCBI", "Saisis ton e-mail dans la fenêtre principale.")
+        return email
+
+    def _lancer(self, fonction, args, apres):
+        if self.tache is not None and self.tache.isRunning():
+            return False
+        self.btn_chercher.setEnabled(False)
+        self.btn_charger.setEnabled(False)
+        self.tache = Travailleur(fonction, *args)
+        self.tache.termine.connect(lambda r: self._fin(apres, r))
+        self.tache.echec.connect(self._echec)
+        self.tache.start()
+        return True
+
+    def _libere(self):
+        self.tache.wait()
+        self.btn_chercher.setEnabled(True)
+        self.btn_charger.setEnabled(True)
+
+    def _fin(self, apres, resultat):
+        self._libere()
+        apres(resultat)
+
+    def _echec(self, message):
+        self._libere()
+        self.etat.setText(f"Erreur : {message}")
+
+    def chercher(self):
+        email = self._email()
+        if not email:
+            return
+        self.etat.setText("Recherche en cours…")
+        self._lancer(rechercher, (self.terme.text(), email, self.base.currentText(),
+                                  self.maximum.value()), self._afficher)
+
+    def _afficher(self, resultats):
+        self.liste.clear()
+        for r in resultats:
+            item = QListWidgetItem(f"{r['accession']:<14} {r['longueur']:>8}  {r['titre']}")
+            item.setData(256, r["accession"])   # 256 = Qt.UserRole
+            self.liste.addItem(item)
+        self.etat.setText(f"{len(resultats)} résultat(s)" if resultats else "Aucun résultat.")
+
+    def charger(self):
+        item = self.liste.currentItem()
+        if item is None:
+            QMessageBox.information(self, "NCBI", "Sélectionne d'abord un résultat.")
+            return
+        email = self._email()
+        if not email:
+            return
+        accession = item.data(256)
+        self.etat.setText(f"Téléchargement de {accession}…")
+        self._lancer(telecharger_fasta, (accession, email), self._charge)
+
+    def _charge(self, chemin):
+        self.dialogue.fenetre.charger_chemin(self.cible.currentText(), str(chemin))
+        self.etat.setText(f"Chargé : {chemin}")
+
+    def attendre(self):
+        if self.tache is not None and self.tache.isRunning():
+            self.tache.wait(10000)
+
+
+def page_ncbi(dialogue):
+    page = PageNCBI(dialogue)
+    dialogue._page_ncbi = page
     return page
