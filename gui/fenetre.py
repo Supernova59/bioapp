@@ -9,6 +9,7 @@ from core.dotplot import dotplot, tracer_dotplot
 from core.alignement import aligner_complet, type_sequence
 from core.ncbi import telecharger_fasta
 from gui.exports import ExportMixin
+from gui.blast import BlastMixin
 from gui.couleurs import colorer_alignement
 from gui.trio import TrioMixin
 from gui.demo import DemoMixin
@@ -23,7 +24,7 @@ from PySide6.QtGui import QFontDatabase
 MAX_CASES = 25_000_000  # garde-fou mémoire (~75 Mo)
 
 
-class Fenetre(DemoMixin, TrioMixin, OutilsMixin, ExportMixin, QMainWindow):
+class Fenetre(BlastMixin, DemoMixin, TrioMixin, OutilsMixin, ExportMixin, QMainWindow):
     def __init__(self, presence=None):
         super().__init__()
         self.presence = presence
@@ -115,6 +116,9 @@ class Fenetre(DemoMixin, TrioMixin, OutilsMixin, ExportMixin, QMainWindow):
         btn_demo = QPushButton("Scénarios…")
         btn_demo.clicked.connect(self.ouvrir_demo)
         export.addWidget(btn_demo)
+        btn_blast = QPushButton("BLAST…")
+        btn_blast.clicked.connect(self.ouvrir_blast)
+        export.addWidget(btn_blast)
         export.addStretch(1)
         layout.addLayout(export)
 
