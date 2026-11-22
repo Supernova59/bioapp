@@ -11,6 +11,7 @@ from core.ncbi import telecharger_fasta
 from gui.exports import ExportMixin
 from gui.couleurs import colorer_alignement
 from gui.trio import TrioMixin
+from gui.demo import DemoMixin
 from PySide6.QtWidgets import QTextEdit
 from gui.outils import OutilsMixin
 from core.sequences import complement_inverse
@@ -22,7 +23,7 @@ from PySide6.QtGui import QFontDatabase
 MAX_CASES = 25_000_000  # garde-fou mémoire (~75 Mo)
 
 
-class Fenetre(TrioMixin, OutilsMixin, ExportMixin, QMainWindow):
+class Fenetre(DemoMixin, TrioMixin, OutilsMixin, ExportMixin, QMainWindow):
     def __init__(self, presence=None):
         super().__init__()
         self.presence = presence
@@ -111,6 +112,9 @@ class Fenetre(TrioMixin, OutilsMixin, ExportMixin, QMainWindow):
         btn_trio = QPushButton("Comparer A/B/C…")
         btn_trio.clicked.connect(self.ouvrir_trio)
         export.addWidget(btn_trio)
+        btn_demo = QPushButton("Scénarios…")
+        btn_demo.clicked.connect(self.ouvrir_demo)
+        export.addWidget(btn_demo)
         export.addStretch(1)
         layout.addLayout(export)
 
